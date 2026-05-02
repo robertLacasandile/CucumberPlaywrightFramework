@@ -1,0 +1,29 @@
+{
+  "name": "cucumber-playwright-automation-framework",
+  "version": "1.0.0",
+  "description": "Node.js Cucumber automation framework implemented with Playwright.",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "cucumber-js",
+    "test:local": "EXECUTION_MODE=local cucumber-js",
+    "test:remote-local": "EXECUTION_MODE=remote-local cucumber-js --parallel 3",
+    "test:remote-grid": "EXECUTION_MODE=remote-grid cucumber-js --parallel 3",
+    "test:headed": "HEADLESS=false EXECUTION_MODE=local cucumber-js",
+    "test:smoke": "EXECUTION_MODE=remote-local cucumber-js --name \"Login using action-aware smart locators herokuapp\"",
+    "report": "node src/framework/reporting/open-report.js",
+    "report:allure": "allure generate allure-results --clean -o allure-report",
+    "report:allure:open": "allure open allure-report",
+    "report:allure:serve": "allure serve allure-results",
+    "install:browsers": "playwright install"
+  },
+  "dependencies": {
+    "@cucumber/cucumber": "^10.9.0",
+    "@playwright/test": "^1.45.0",
+    "playwright": "^1.45.0"
+  },
+  "devDependencies": {
+    "allure-commandline": "^2.38.1",
+    "allure-cucumberjs": "^3.7.1"
+  }
+}
