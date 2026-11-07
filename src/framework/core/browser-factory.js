@@ -39,14 +39,12 @@ async function createBrowser(options = {}) {
     return chromium.connect(gridUrl);
   }
 
-  return browserType.launch({
-    headless,
-    args: [
-      '--disable-dev-shm-usage',
-      '--disable-notifications',
-      '--no-sandbox'
-    ]
-  });
+  // these are Chromium switches; WebKit on Linux refuses to start with unknown options
+  const args = browserType === chromium
+    ? ['--disable-dev-shm-usage', '--disable-notifications', '--no-sandbox']
+    : [];
+
+  return browserType.launch({ headless, args });
 }
 
 /**

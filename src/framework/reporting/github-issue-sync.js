@@ -74,10 +74,13 @@ function readScenarios() {
 
       const steps = (el.steps || []).filter((s) => s.name);
       const statuses = (el.steps || []).map((s) => s.result?.status);
-      const status = statuses.includes('failed') ? 'failed'
-        : statuses.every((s) => s === 'passed') ? 'passed'
-          : 'other'; // skipped, pending, undefined, ambiguous: leave the issue as it is
       const failedStep = (el.steps || []).find((s) => s.result?.status === 'failed');
+      // a failing Before/After hook means the test could not run (browser, server, config), not an app bug
+      const setupFailure = Boolean(failedStep && !failedStep.name && /^(Before|After)$/.test(String(failedStep.keyword).trim()));
+      const status = setupFailure ? 'setup'
+        : statuses.includes('failed') ? 'failed'
+          : statuses.every((s) => s === 'passed') ? 'passed'
+            : 'other'; // skipped, pending, undefined, ambiguous: leave the issue as it is
       const isOutline = /outline|template/i.test(el.keyword);
       // outline rows share a name and id, so the row's own step text tells them apart
       const rowHash = isOutline
@@ -193,6 +196,17 @@ function main() {
   const commit = appCommit();
   const scenarios = readScenarios();
   console.log(`[ISSUES] ${scenarios.length} scenario(s) from ${path.relative(process.cwd(), reportPath)} -> ${repo}${dryRun ? ' (dry run)' : ''}`);
+
+  const setup = scenarios.filter((s) => s.status === 'setup');
+  if (setup.length) {
+    console.log(`[ISSUES] ${setup.length} scenario(s) failed in a setup hook; no issues for those:`);
+    console.log(`[ISSUES]   ${stripAnsi(setup[0].error || '').split('\n')[0]}`);
+  }
+  if (setup.length === scenarios.length) {
+    console.error('[ISSUES] ERROR - every scenario failed before it started, so the run tells nothing about the app.');
+    process.exitCode = 1;
+    return;
+  }
 
   ensureLabel();
   const issues = existingIssues();
