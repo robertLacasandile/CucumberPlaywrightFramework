@@ -1,0 +1,87 @@
+name: Halaga tests
+
+# Runs the Halaga scenarios against the HalagaApplication repo and syncs GitHub issues there:
+# a failing scenario opens (or updates) an issue, a passing one closes its issue.
+#
+# Needs the secret HALAGA_REPO_TOKEN: a fine-grained token for robertLacasandile/HalagaApplication
+# with Contents: read and Issues: read and write (this repo's GITHUB_TOKEN cannot reach another repo).
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_ref:
+        description: HalagaApplication branch, tag or commit to test
+        default: main
+  schedule:
+    - cron: '0 1 * * *' # every day at 09:00 Philippine time
+  # HalagaApplication can start this on every push with a repository_dispatch of type "halaga-pushed"
+  # (client_payload.ref = the pushed commit)
+  repository_dispatch:
+    types: [halaga-pushed]
+
+concurrency:
+  group: halaga-tests
+  cancel-in-progress: false
+
+jobs:
+  halaga:
+    name: Halaga UI tests + issue sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HEADLESS: 'true'
+      CI: 'true'
+
+    steps:
+      - name: Checkout framework
+        uses: actions/checkout@v4
+
+      - name: Checkout HalagaApplication
+        uses: actions/checkout@v4
+        with:
+          repository: robertLacasandile/HalagaApplication
+          ref: ${{ github.event.client_payload.ref || inputs.app_ref || 'main' }}
+          token: ${{ secrets.HALAGA_REPO_TOKEN }}
+          path: halaga-app
+
+      - name: Point the tests at the checkout
+        run: |
+          echo "APP_HALAGA_DIR=$GITHUB_WORKSPACE/halaga-app/src/main/resources/ph/debtplanner/mobile" >> "$GITHUB_ENV"
+          echo "HALAGA_COMMIT=$(git -C halaga-app rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+
+      - name: Run Halaga tests
+        id: tests
+        continue-on-error: true
+        run: npm run test:halaga
+
+      - name: Sync GitHub issues
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.HALAGA_REPO_TOKEN }}
+        run: npm run issues:sync
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: halaga-test-reports
+          path: |
+            target/reports
+            target/screenshots
+          if-no-files-found: ignore
+
+      - name: Fail the job when tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1

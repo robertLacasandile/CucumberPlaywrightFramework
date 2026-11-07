@@ -1,0 +1,64 @@
+name: Regression
+
+on:
+  schedule:
+    - cron: "0 20 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: Cucumber tag expression to run
+        required: false
+        default: "not @ignore"
+
+concurrency:
+  group: regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cucumber-regression:
+    name: Cucumber regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      CI: true
+      HEADLESS: true
+      EXECUTION_MODE: remote-local
+      CUCUMBER_TAGS: ${{ github.event.inputs.tags || 'not @ignore' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Cucumber regression
+        run: npx cucumber-js --tags "$CUCUMBER_TAGS"
+
+      - name: Generate Allure report
+        if: always()
+        run: npm run report:allure
+
+      - name: Upload regression artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-artifacts
+          path: |
+            target/reports/
+            target/screenshots/
+            target/videos/
+            allure-results/
+            allure-report/
+          if-no-files-found: ignore
+          retention-days: 30

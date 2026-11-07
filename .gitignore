@@ -34,3 +34,6 @@ playwright-report/
 test-results/
 allure-results/
 allure-report/
+
+### JetBrains ###
+.idea/
