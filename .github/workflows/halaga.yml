@@ -26,7 +26,8 @@ concurrency:
 jobs:
   halaga:
     name: Halaga UI tests + issue sync
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04, which Playwright 1.59 cannot install WebKit on
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       HEADLESS: 'true'
@@ -67,7 +68,8 @@ jobs:
         run: npm run test:halaga
 
       - name: Sync GitHub issues
-        if: always()
+        # only when the tests ran: a setup failure is not a test failure
+        if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')
         env:
           GH_TOKEN: ${{ secrets.HALAGA_REPO_TOKEN }}
         run: npm run issues:sync
