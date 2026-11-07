@@ -1,0 +1,47 @@
+name: CD Readiness
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+jobs:
+  package-test-assets:
+    name: Package test assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate package
+        run: npm test -- --dry-run
+
+      - name: Create test asset bundle
+        run: |
+          mkdir -p dist
+          tar \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=target \
+            --exclude=allure-results \
+            --exclude=allure-report \
+            -czf dist/cucumber-playwright-framework-${{ github.sha }}.tar.gz .
+
+      - name: Upload test asset bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-playwright-framework
+          path: dist/*.tar.gz
+          retention-days: 30

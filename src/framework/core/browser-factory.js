@@ -1,4 +1,4 @@
-const { chromium, firefox, webkit } = require('playwright');
+const { chromium, firefox, webkit, devices } = require('playwright');
 const { config } = require('../config/config-manager');
 const logger = require('../logging/framework-logger').getLogger('BrowserFactory');
 
@@ -13,8 +13,8 @@ function executionMode() {
   return (process.env.EXECUTION_MODE || config.get('execution.mode', 'local')).toLowerCase();
 }
 
-function browserName() {
-  return (process.env.BROWSER || config.get('execution.browser', 'chromium')).toLowerCase();
+function browserName(override) {
+  return (override || process.env.BROWSER || config.get('execution.browser', 'chromium')).toLowerCase();
 }
 
 function shouldRunHeadless(mode) {
@@ -26,9 +26,9 @@ function shouldRunHeadless(mode) {
   return String(explicitHeadless).toLowerCase() === 'true';
 }
 
-async function createBrowser() {
+async function createBrowser(options = {}) {
   const mode = executionMode();
-  const name = browserName();
+  const name = browserName(options.browser);
   const headless = shouldRunHeadless(mode);
   const browserType = browsers[name] || chromium;
 
@@ -49,9 +49,19 @@ async function createBrowser() {
   });
 }
 
-async function createContext(browser) {
+/**
+ * options.device: a Playwright device name (for example "iPhone 14 Pro") to emulate a phone's
+ * screen, touch, user agent and pixel ratio instead of the 1920x1080 desktop viewport.
+ */
+async function createContext(browser, options = {}) {
+  const device = options.device ? devices[options.device] : null;
+  if (options.device && !device) {
+    throw new Error(`Unknown Playwright device: ${options.device}`);
+  }
+
   return browser.newContext({
-    viewport: { width: 1920, height: 1080 },
+    ...(device || { viewport: { width: 1920, height: 1080 } }),
+    ...(options.contextOptions || {}),
     ignoreHTTPSErrors: true,
     recordVideo: process.env.PWVIDEO ? { dir: 'target/videos' } : undefined
   });
